@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Kelola Data Cuti</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="logo">
+                Admin<span>Panel</span>
+            </div>
+            <div class="nav-links">
+                <span>👑 Admin: <span id="adminName"></span></span>
+                <button class="btn btn-danger" onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+            <h1 style="color: white;">📊 Kelola Data Cuti</h1>
+            <button class="btn btn-primary" onclick="openAddModal()">+ Tambah Cuti</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card"><h3 id="totalKaryawan">0</h3><p>Total Karyawan</p></div>
+            <div class="stat-card"><h3 id="totalPengajuan">0</h3><p>Total Pengajuan</p></div>
+            <div class="stat-card"><h3 id="totalHariCuti">0</h3><p>Total Hari Cuti</p></div>
+        </div>
+
+        <div class="filters-bar">
+            <div class="search-box">
+                🔍 <input type="text" id="searchInput" placeholder="Cari nama atau jabatan...">
+            </div>
+            <select id="filterJabatan"><option value="all">Semua Jabatan</option>
+                <option value="Mekanik">Mekanik</option><option value="Help. Mek">Help. Mek</option>
+                <option value="T. Ban">T. Ban</option><option value="Kr. Bengkel">Kr. Bengkel</option>
+            </select>
+            <button class="btn btn-primary" onclick="exportToExcel()">📎 Export Excel</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead><tr>
+                    <th>No</th><th>Nama</th><th>No Kary</th><th>Jabatan</th>
+                    <th>Cuti Dari</th><th>Cuti Sampai</th><th>Durasi</th>
+                    <th>Keperluan</th><th>Status</th><th>Aksi</th>
+                </tr></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal Tambah/Edit -->
+    <div id="dataModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="modalTitle">Tambah Cuti</h2><span class="modal-close" onclick="closeModal()">&times;</span></div>
+            <form id="cutiForm">
+                <div class="form-group"><label>Nama</label><input type="text" id="editNama" required></div>
+                <div class="form-group"><label>No Karyawan</label><input type="text" id="editNoKary"></div>
+                <div class="form-group"><label>Jabatan</label><input type="text" id="editJabatan"></div>
+                <div class="form-group"><label>Cuti Dari</label><input type="date" id="editCutiDari"></div>
+                <div class="form-group"><label>Cuti Sampai</label><input type="date" id="editCutiSampai"></div>
+                <div class="form-group"><label>Keperluan</label><input type="text" id="editKeperluan"></div>
+                <div class="form-group"><label>Keterangan</label><input type="text" id="editKetCuti"></div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Simpan</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        let allData = [];
+        let editIndex = null;
+
+        document.getElementById('adminName').innerText = localStorage.getItem('currentUser') || 'Admin';
+        if (!localStorage.getItem('currentUser')) window.location.href = 'index.html';
+
+        async function loadData() {
+            allData = await fetchCutiData();
+            updateStats();
+            renderTable();
+        }
+
+        function updateStats() {
+            const uniqueKaryawan = new Set(allData.map(d => d.Nama));
+            const totalHari = allData.reduce((sum, d) => sum + (parseInt(d.Dipakai) || 0), 0);
+            document.getElementById('totalKaryawan').innerText = uniqueKaryawan.size;
+            document.getElementById('totalPengajuan').innerText = allData.length;
+            document.getElementById('totalHariCuti').innerText = totalHari;
+        }
+
+        function renderTable() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            const jabatan = document.getElementById('filterJabatan').value;
+            let filtered = allData.filter(d => {
+                const matchText = keyword === '' || (d.Nama && d.Nama.toLowerCase().includes(keyword));
+                const matchJabatan = jabatan === 'all' || d.Jabatan === jabatan;
+                return matchText && matchJabatan;
+            });
+            
+            const tbody = document.getElementById('tableBody');
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">📭 Tidak ada data</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            filtered.forEach((item, idx) => {
+                html += `<tr>
+                    <td>${idx+1}</td>
+                    <td><strong>${escapeHtml(item.Nama)}</strong></td>
+                    <td>${escapeHtml(item['No Kary'])}</td>
+                    <td>${escapeHtml(item.Jabatan)}</td>
+                    <td>${escapeHtml(item['Cuti Dari'])}</td>
+                    <td>${escapeHtml(item['Cuti Sampai'])}</td>
+                    <td><span class="badge badge-info">${item.Dipakai || 0} hari</span></td>
+                    <td>${escapeHtml(item['Keperluan cuti'])}</td>
+                    <td><span class="badge badge-success">${item.Status || 'Aktif'}</span></td>
+                    <td>
+                        <button class="btn btn-outline" style="padding:4px 12px; margin-right:5px;" onclick="openEditModal(${allData.indexOf(item)})">✏️</button>
+                        <button class="btn btn-danger" style="padding:4px 12px;" onclick="deleteData(${allData.indexOf(item)})">🗑️</button>
+                    </td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function openAddModal() {
+            editIndex = null;
+            document.getElementById('modalTitle').innerText = 'Tambah Cuti';
+            document.getElementById('cutiForm').reset();
+            document.getElementById('dataModal').classList.add('active');
+        }
+
+        function openEditModal(index) {
+            editIndex = index;
+            const item = allData[index];
+            document.getElementById('modalTitle').innerText = 'Edit Cuti';
+            document.getElementById('editNama').value = item.Nama || '';
+            document.getElementById('editNoKary').value = item['No Kary'] || '';
+            document.getElementById('editJabatan').value = item.Jabatan || '';
+            document.getElementById('editCutiDari').value = item['Cuti Dari'] || '';
+            document.getElementById('editCutiSampai').value = item['Cuti Sampai'] || '';
+            document.getElementById('editKeperluan').value = item['Keperluan cuti'] || '';
+            document.getElementById('editKetCuti').value = item['Ket Cuti'] || '';
+            document.getElementById('dataModal').classList.add('active');
+        }
+
+        document.getElementById('cutiForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newData = {
+                Nama: document.getElementById('editNama').value,
+                'No Kary': document.getElementById('editNoKary').value,
+                Jabatan: document.getElementById('editJabatan').value,
+                'Cuti Dari': document.getElementById('editCutiDari').value,
+                'Cuti Sampai': document.getElementById('editCutiSampai').value,
+                'Keperluan cuti': document.getElementById('editKeperluan').value,
+                'Ket Cuti': document.getElementById('editKetCuti').value,
+                Dipakai: '1',
+                Status: 'Aktif'
+            };
+            
+            if (editIndex !== null) {
+                allData[editIndex] = newData;
+                showAlert('Data berhasil diupdate! (Simulasi - data asli di Spreadsheet)', 'success');
+            } else {
+                allData.push(newData);
+                showAlert('Data berhasil ditambahkan! (Simulasi - data asli di Spreadsheet)', 'success');
+            }
+            closeModal();
+            updateStats();
+            renderTable();
+        });
+
+        function deleteData(index) {
+            if (confirm('Yakin hapus data ini?')) {
+                allData.splice(index, 1);
+                showAlert('Data berhasil dihapus! (Simulasi)', 'success');
+                updateStats();
+                renderTable();
+            }
+        }
+
+        function closeModal() { document.getElementById('dataModal').classList.remove('active'); }
+        function exportToExcel() { alert('Fitur export Excel akan segera hadir!'); }
+        
+        document.getElementById('searchInput').addEventListener('input', renderTable);
+        document.getElementById('filterJabatan').addEventListener('change', renderTable);
+        loadData();
+    </script>
+</body>
+</html>
