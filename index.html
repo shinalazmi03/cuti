@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Informasi Cuti Karyawan</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .hero {
+            text-align: center;
+            padding: 80px 20px;
+            color: white;
+        }
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        .hero p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-top: 60px;
+        }
+        .login-card {
+            max-width: 400px;
+            margin: 60px auto 0;
+            background: white;
+            border-radius: 32px;
+            padding: 40px;
+            text-align: center;
+        }
+        .role-selector {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .role-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .role-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="logo">
+                Cuti<span>Karyawan</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Beranda</a>
+                <a href="visitor.html">Lihat Data Cuti</a>
+                <button class="btn btn-primary" onclick="openLoginModal()">Login</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="hero">
+            <h1>Sistem Informasi <br>Cuti Karyawan</h1>
+            <p>Kelola dan pantau jadwal cuti karyawan dengan mudah, cepat, dan terintegrasi.</p>
+        </div>
+
+        <div class="feature-grid">
+            <div class="card">
+                <div style="font-size: 3rem;">📋</div>
+                <h3>Data Real-Time</h3>
+                <p>Data cuti langsung tersinkronisasi dari spreadsheet Anda.</p>
+            </div>
+            <div class="card">
+                <div style="font-size: 3rem;">🔍</div>
+                <h3>Pencarian Mudah</h3>
+                <p>Cari data cuti berdasarkan nama atau periode.</p>
+            </div>
+            <div class="card">
+                <div style="font-size: 3rem;">📊</div>
+                <h3>Laporan Lengkap</h3>
+                <p>Lihat statistik cuti per karyawan.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Login -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Login</h2>
+                <span class="modal-close" onclick="closeLoginModal()">&times;</span>
+            </div>
+            <div class="role-selector">
+                <button class="role-btn active" data-role="user">👤 User</button>
+                <button class="role-btn" data-role="admin">👑 Admin</button>
+            </div>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="loginUsername" placeholder="Masukkan username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" placeholder="Masukkan password">
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="processLogin()">Login</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        let selectedRole = 'user';
+
+        document.querySelectorAll('.role-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedRole = btn.dataset.role;
+            });
+        });
+
+        function openLoginModal() {
+            document.getElementById('loginModal').classList.add('active');
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.remove('active');
+        }
+
+        async function processLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            if (!username || !password) {
+                alert('Isi username dan password!');
+                return;
+            }
+
+            try {
+                const response = await fetch(LOGIN_API);
+                const users = await response.json();
+                
+                const validUser = users.find(u => u.username === username && u.password === password);
+                
+                if (validUser) {
+                    localStorage.setItem('currentUser', username);
+                    localStorage.setItem('userRole', selectedRole);
+                    closeLoginModal();
+                    
+                    if (selectedRole === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else {
+                        window.location.href = 'dashboard.html';
+                    }
+                } else {
+                    alert('Username atau password salah!');
+                }
+            } catch (error) {
+                alert('Gagal terhubung ke server!');
+            }
+        }
+    </script>
+</body>
+</html>
